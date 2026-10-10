@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: hiresense-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-hiresense}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hiresense_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-hiresense_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hiresense} -d ${POSTGRES_DB:-hiresense_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hiresense-backend
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-hiresense}:${POSTGRES_PASSWORD:-hiresense_secret}@db:5432/${POSTGRES_DB:-hiresense_db}
+      - EMBEDDING_MODEL_NAME=all-MiniLM-L6-v2
+    ports:
+      - "8000:8000"
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: hiresense-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  uploads_data:
